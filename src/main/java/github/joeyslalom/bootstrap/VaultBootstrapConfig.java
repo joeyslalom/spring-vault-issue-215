@@ -7,6 +7,8 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.client.LaxRedirectStrategy;
 import org.apache.http.impl.conn.DefaultSchemePortResolver;
 import org.apache.http.impl.conn.SystemDefaultRoutePlanner;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,6 +16,9 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
+import org.springframework.vault.core.lease.SecretLeaseContainer;
+import org.springframework.vault.core.lease.event.LeaseListener;
+import org.springframework.vault.core.lease.event.SecretLeaseEvent;
 import org.springframework.vault.support.ClientOptions;
 
 import javax.net.ssl.SSLContext;
@@ -31,8 +36,23 @@ import static org.springframework.vault.config.AbstractVaultConfiguration.Client
 
 @Configuration
 public class VaultBootstrapConfig {
+    private static Logger log = LoggerFactory.getLogger(VaultBootstrapConfig.class);
 
+    private static String leaseInfo(SecretLeaseEvent event) {
+        return event + " path=" + event.getSource().getPath() + " lease=" + event.getLease();
+    }
 
+    class Configured {
+
+    }
+
+    @Bean
+    Configured addListeners(SecretLeaseContainer container) {
+        container.addLeaseListener(event -> log.info("lease event: info=" + leaseInfo(event)));
+        container.addErrorListener((event, exception) -> log.error("lease error: info=" + leaseInfo(event), exception));
+
+        return new Configured();
+    }
 
     /**
      * From VaultBootstrapConfiguration.  Create a ClientHttpRequestFactory that uses a cert for TLS with Vault.
